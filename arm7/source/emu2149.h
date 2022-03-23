@@ -23,7 +23,7 @@ extern "C"
 {
 #endif
 
-#pragma pack(1) 
+//#pragma pack(1) 
   typedef struct __PSG
   {
 
@@ -74,7 +74,7 @@ extern "C"
     unsigned int control;
     unsigned int reg_select;
   }
-#pragma pack() 
+//#pragma pack() 
   PSG;
 
   EMU2149_API void PSG_set_quality (PSG * psg, unsigned int q);

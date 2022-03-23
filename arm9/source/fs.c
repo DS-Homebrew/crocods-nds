@@ -7,13 +7,12 @@
 #include <unistd.h>
 
 #include <nds.h>
-#include <nds/jtypes.h>
+#include <nds/ndstypes.h>
 #include <nds/arm9/console.h> //basic print funcionality
 #include <nds/arm9/image.h>
 
-#include <sys/dir.h>
-
-#include "fat.h"
+#include <dirent.h>
+#include <fat.h>
 
 #include "fs.h"
 #include "plateform.h"
@@ -114,25 +113,22 @@ void FS_getFileList_FAT(FS_AddFile AddFile, char *root) {
 	char fileName[256]; 
     char fullfile[256];
 	
-	if (isFATSystem) { 
-        DIR_ITER *entry;
-        struct stat fs;
-
+	if (isFATSystem) {
 myprintf("Read FS");
 
-        entry=diropen(root);
+        DIR *entry=opendir(root);
         if (entry!=NULL) 
 		while (1) {
-			int len;
+			struct dirent *pent = readdir(entry);
 
 
-            if (dirnext(entry, fileName, &fs)==-1) break;
+            if (pent==NULL) break;
 myprintf("%s", fileName);
             strtolower(fileName);
 			
             sprintf(fullfile, "%s%s", root, fileName);
 
-			len=strlen(fullfile);
+			int len=strlen(fullfile);
 			if (len>4) {
 				if (!strcasecmp(".zip",fullfile+len-4)) {
 					u32 zipsize;

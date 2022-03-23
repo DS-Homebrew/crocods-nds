@@ -6,6 +6,7 @@ arm7/build
 *.zip
 *.nds
 *.arm9
+*.arm7
 *.ds.gba
 arm7.bin
 arm9/*.elf

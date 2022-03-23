@@ -1,4 +1,4 @@
-#include <nds/jtypes.h>
+#include <nds/ndstypes.h>
 
 //byte array representing the picture
 const u16 fontData[] = {

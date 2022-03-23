@@ -8,8 +8,8 @@
 //---------------------------------------------------------------------------------
 typedef struct sTransferRegion2 {
 //---------------------------------------------------------------------------------
-  TransferRegion ipc;
-  int16 touchXave, touchYave;
+  //TransferRegion ipc;
+  //int16 touchXave, touchYave;
 
   uint16 soundCommand;
   PSG psg;
@@ -18,6 +18,6 @@ typedef struct sTransferRegion2 {
 } 
 TransferRegion2, * pTransferRegion2;
 
-#define IPC2 ((TransferRegion2 volatile *)(0x027FF000))
+#define IPC2 ((TransferRegion2 volatile *)(0x02FFF000))
 
 #endif

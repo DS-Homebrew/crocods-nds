@@ -1,9 +1,8 @@
-export DEVKITARM := /e/devkitPro/devkitARM
-export DEVKITPRO := /e/devkitPro/
-
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
+.SECONDARY:
+
 ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
 endif
@@ -15,35 +14,17 @@ export TOPDIR		:=	$(CURDIR)
 
 ICON 		:= -b $(CURDIR)/logo.bmp "CrocoDS;redbug;http://deadketchup.kyuran.be/"
 
-#---------------------------------------------------------------------------------
-# path to tools - this can be deleted if you set the path in windows
-#---------------------------------------------------------------------------------
-export PATH		:=	$(DEVKITARM)/bin:$(PATH)
-
-.PHONY: $(TARGET).arm7 $(TARGET).arm9
+.PHONY: arm7/$(TARGET).elf arm9/$(TARGET).elf
 
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-all: $(TARGET).ds.gba 
-
-#dlditool mpcf.dldi $(TARGET).nds
-
-$(TARGET).ds.gba	: $(TARGET).nds
+all: $(TARGET).nds
 
 #---------------------------------------------------------------------------------
-$(TARGET).nds	:	$(TARGET).arm7 $(TARGET).arm9
-	ndstool	-c $(TARGET).nds -7 $(TARGET).arm7 -9 $(TARGET).arm9 $(ICON)
-	dsbuild $(TARGET).nds -o $(TARGET).ds.gba
-	padbin 512 $(TARGET).nds
-	cat $(TARGET).nds other/imagefcsr.img  > $(TARGET)_fs.nds
-	other/dlditool.exe other/fcsr.dldi $(TARGET)_fs.nds
+$(TARGET).nds	:	arm7/$(TARGET).elf arm9/$(TARGET).elf
+	ndstool	-c $(TARGET).nds -7 arm7/$(TARGET).elf -9 arm9/$(TARGET).elf $(ICON)
 	
-	
-#---------------------------------------------------------------------------------
-$(TARGET).arm7	: arm7/$(TARGET).elf
-$(TARGET).arm9	: arm9/$(TARGET).elf
-
 #---------------------------------------------------------------------------------
 arm7/$(TARGET).elf:
 	$(MAKE) -C arm7

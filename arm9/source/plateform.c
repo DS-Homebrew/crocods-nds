@@ -64,11 +64,10 @@
 
 #define AlphaBlendFast(pixel,backpixel) (((((pixel) & 0x7bde) >> 1) | (((backpixel) & 0x7bde) >> 1)) | 0x8000)
 
-#define SCR_TOUCH (((~IPC->buttons) >> 6) & 1)
-
 extern int turbo;        // dans main.c
 extern int Image;        // dans upd.c
 
+touchPosition touch;
 int usestylus=0, usestylusauto=1;
 int usemagnum=0;
 
@@ -546,7 +545,7 @@ struct kmenu *AddMenu(struct kmenu *parent, char *title, int id)
 		i0=NULL;
 		i=kcur->parent->firstchild;
 		do {
-			if (stricmp(kcur->title,i->title)<0) {
+			if (strcmp(kcur->title,i->title)<0) {
 				break;  // placer kcur juste avant i
 			}
 			i0=i;
@@ -762,19 +761,21 @@ void DiskSelection(struct kmenu *current)
 
 	// Vide keybuffer
 	do {
-		keys_pressed = ~(REG_KEYINPUT);
+		scanKeys();
+		keys_pressed = keysDown();
+		touchRead(&touch);
 	} while ((keys_pressed & (KEY_DOWN | KEY_UP | KEY_A | KEY_B | KEY_L | KEY_R))!=0);
 
 
 
 	x=y=styluspressed=0;
 	while(1) {
-		if ((~IPC->buttons) & (1 << 6)) {
+		if (keys_pressed & KEY_TOUCH) {
 			if (styluspressed==0) {
 				styluspressed=1;
 
-				x=IPC->touchXpx;
-				y=IPC->touchYpx;
+				x=touch.px;
+				y=touch.py;
 			}
 		} else {
 			if (styluspressed==1) {
@@ -816,7 +817,8 @@ void SelectSNAP(void)
 
 	// Wait key off
 	do {
-		keys_pressed = ~(REG_KEYINPUT);
+		scanKeys();
+		keys_pressed = keysDown();
 	} while ((keys_pressed & (KEY_DOWN | KEY_UP | KEY_A | KEY_B | KEY_L | KEY_R))!=0);
 
 	DrawTextLeft(backBuffer, filefont, RGB15(31,31,0) | 0x8000, 15,  1, "Select Save Slot");
@@ -1089,10 +1091,14 @@ void RedefineKey(int key)
 
 	keyEmul=3;
 
-	while(((~IPC->buttons) & (1 << 6))==0);
+	do {
+		scanKeys();
+		n = keysDown();
+		touchRead(&touch);
+	} while(!(n & KEY_TOUCH));
 
-	x=IPC->touchXpx;
-	y=IPC->touchYpx;
+	x=touch.px;
+	y=touch.py;
 
 	for (n=0;n<NBCPCKEY;n++) {
 		if ( (x>=keypos[n].left) && (x<=keypos[n].right) && (y>=keypos[n].top) && (y<=keypos[n].bottom) ) {
@@ -1155,8 +1161,8 @@ int ExecuteMenu(int n, struct kmenu *current)
 		break;
 	case ID_SCREEN_320:
 		resize=2;
-		BG3_XDX = 320; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
-		BG3_CX = (XStart*4) << 8; 
+		REG_BG3PA = 320; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
+		REG_BG3X = (XStart*4) << 8; 
 		memcpy(offsetY, offsetY200,272);
 		x0=(XStart*4);
 		y0=36;
@@ -1166,8 +1172,8 @@ int ExecuteMenu(int n, struct kmenu *current)
 		break;
 	case ID_SCREEN_NORESIZE:
 		resize=3;
-		BG3_XDX = 256; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
-		BG3_CX = (XStart*4) << 8; 
+		REG_BG3PA = 256; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
+		REG_BG3X = (XStart*4) << 8; 
 		memcpy(offsetY, offsetY192,272);
 		x0=(XStart*4);
 		y0=40;
@@ -1177,8 +1183,8 @@ int ExecuteMenu(int n, struct kmenu *current)
 		break;
 	case ID_SCREEN_OVERSCAN:
 		resize=4;
-		BG3_XDX = 384; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
-		BG3_CX = 0;
+		REG_BG3PA = 384; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
+		REG_BG3X = 0;
 		memcpy(offsetY, offsetY272,272);
 		x0=(XStart*4);
 		y0=0;
@@ -1741,8 +1747,8 @@ void UpdateScreen( void )
 			y1 = max( ( 35 - RegsCRTC[7] ) << 3, 0);
 			y2 = min( y1 + (RegsCRTC[6] << 3), 272);
 
-			BG3_XDX = (x2-x1); 
-			BG3_CX = x1 << 8; 
+			REG_BG3PA = (x2-x1); 
+			REG_BG3X = x1 << 8; 
 
 			height=(y2-y1);
 			if (height<192) height=192;
@@ -2194,16 +2200,16 @@ int nds_ReadKey(void)
 
 		scanKeys();
 		keys_pressed = keysHeld();
-		
+
 		if (!multikeypressed) {
 			memset( clav, 0xFF, sizeof( clav ) );
 		}
 
-		if (SCR_TOUCH) {			// styluspressed
+		if (KEY_TOUCH) {			// styluspressed
 			int x,y,n;
 
-			x=IPC->touchXpx;
-			y=IPC->touchYpx;
+			x=touch.px;
+			y=touch.py;
 
 			if (!usemagnum) {
 				if (styluspressed==0) {
@@ -2353,18 +2359,18 @@ int nds_ReadKey(void)
 
 			if ((keys_pressed & KEY_LEFT)==KEY_LEFT) {
 				if (x0>0) x0--;
-				BG3_CX=x0<<8;
+				REG_BG3X=x0<<8;
 			}
 
 			if ((keys_pressed & KEY_RIGHT)==KEY_RIGHT) {
 				int maxx;
-				maxx=384-BG3_XDX;
+				maxx=384-REG_BG3PA;
 				if (x0<maxx) x0++;
-				BG3_CX=x0<<8;
+				REG_BG3X=x0<<8;
 			}
 
 			if ((keys_pressed & KEY_A)==KEY_A) {
-				BG3_CX=(XStart*4)<<8;
+				REG_BG3X=(XStart*4)<<8;
 			}
 
 		} else {
@@ -2539,7 +2545,7 @@ void irqVBlank(void) {
 void nds_init(void)
 {
 	IPC2->soundCommand = 0;
-	powerON(POWER_ALL_2D);
+	powerOn(POWER_ALL_2D);
 
 	irqInit();                    // IRQ basic setup
 	irqSet(IRQ_VBLANK, irqVBlank);
@@ -2557,29 +2563,29 @@ void nds_init(void)
 	vramSetBankC(VRAM_C_SUB_BG_0x06200000);
 	vramSetBankD(VRAM_D_LCD);
 
-	BG3_CR = BG_BMP8_512x256 | BG_BMP_BASE(0) | BG_PRIORITY(3);
-	BG3_XDX = 320; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
-	BG3_XDY = 0;
-	BG3_YDX = 0;
-	BG3_YDY = 256; // Taille d'affichage360 - 108; // 360 = DISPLAY_X
-	BG3_CX = 0<<8;
-	BG3_CY = 0<<8; // 32<<8;
+	REG_BG3CNT = BG_BMP8_512x256 | BG_BMP_BASE(0) | BG_PRIORITY(3);
+	REG_BG3PA = 320; // 256; // 360 - 54;  // 360 = DISPLAY_X // Taille d'affichage
+	REG_BG3PB = 0;
+	REG_BG3PC = 0;
+	REG_BG3PD = 256; // Taille d'affichage360 - 108; // 360 = DISPLAY_X
+	REG_BG3X = 0<<8;
+	REG_BG3Y = 0<<8; // 32<<8;
 	frontBuffer = (u8*)BG_BMP_RAM(0);
 
 	MemBitmap = frontBuffer;
 	// MemBitmap=MyAlloc(256*(192+1),"MemBitmap"); // (192+1) for overflow
 
 #ifndef USE_CONSOLE
-	SUB_BG3_CR = BG_BMP16_256x256 | BG_BMP_BASE(0) | BG_PRIORITY(3);
-	SUB_BG3_XDX = 256;
-	SUB_BG3_XDY = 0;
-	SUB_BG3_YDX = 0;
-	SUB_BG3_YDY = 256;
-	SUB_BG3_CX = 0;
-	SUB_BG3_CY = 0;
+	REG_BG3CNT_SUB = BG_BMP16_256x256 | BG_BMP_BASE(0) | BG_PRIORITY(3);
+	REG_BG3PA_SUB = 256;
+	REG_BG3PB_SUB = 0;
+	REG_BG3PC_SUB = 0;
+	REG_BG3PD_SUB = 256;
+	REG_BG3X_SUB = 0;
+	REG_BG3Y_SUB = 0;
 	backBuffer=(u16*)BG_BMP_RAM_SUB(0);
 
-	SUB_BG0_CR = BG_256_COLOR | BG_TILE_BASE(0) | BG_MAP_BASE(20) | BG_PRIORITY(0);
+	REG_BG0CNT_SUB = BG_COLOR_256 | BG_TILE_BASE(0) | BG_MAP_BASE(20) | BG_PRIORITY(0);
 #else
 	videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE);
 	vramSetBankC(VRAM_C_SUB_BG);
@@ -2636,9 +2642,9 @@ void nds_init(void)
 	int n;
 	int oldbg3xdx;
 
-	oldbg3xdx=BG3_XDX;
+	oldbg3xdx=REG_BG3PA;
 
-	BG3_XDX = 256;
+	REG_BG3PA = 256;
 
 	gif=(u8*)malloc(256*192);
 	ReadBackgroundGif8(gif, (u8*)neospring2007_gif, neospring2007_gif_size);
@@ -2651,7 +2657,7 @@ void nds_init(void)
 
 	memset(frontBuffer, 0, 256*192*2);
 
-	BG3_XDX = oldbg3xdx;
+	REG_BG3PA = oldbg3xdx;
 	}
 	*/
 
@@ -2661,9 +2667,9 @@ void nds_init(void)
 	int n;
 	int oldbg3xdx;
 
-	oldbg3xdx=BG3_XDX;
+	oldbg3xdx=REG_BG3PA;
 
-	BG3_XDX = 256;
+	REG_BG3PA = 256;
 
 	gif=(u8*)malloc(256*192);
 	ReadBackgroundGif8(gif, (u8*)splash1_gif, splash1_gif_size);
@@ -2676,7 +2682,7 @@ void nds_init(void)
 
 	memset(frontBuffer, 0, 256*192*2);
 
-	BG3_XDX = oldbg3xdx;
+	REG_BG3PA = oldbg3xdx;
 	}
 	*/
 
